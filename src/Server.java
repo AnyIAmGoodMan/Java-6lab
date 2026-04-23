@@ -56,9 +56,16 @@ public class Server {
             }
         }
 
-        ServerSocketChannel server = ServerSocketChannel.open();
-        server.bind(new InetSocketAddress(12345));
-        server.configureBlocking(false);
+        ServerSocketChannel server;
+
+        try {
+            server = ServerSocketChannel.open();
+            server.bind(new InetSocketAddress(12345));
+            server.configureBlocking(false);
+        } catch (IOException e) {
+            logger.error("Порт уже занят. Сервер уже запущен?");
+            return;
+        }
 
         Selector selector = Selector.open();
         server.register(selector, SelectionKey.OP_ACCEPT);
