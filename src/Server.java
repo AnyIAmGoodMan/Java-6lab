@@ -63,7 +63,7 @@ public class Server {
             server.bind(new InetSocketAddress(12345));
             server.configureBlocking(false);
         } catch (IOException e) {
-            logger.error("Порт уже занят. Сервер уже запущен?");
+            logger.error("Порт уже занят. Сервер уже запущен.");
             return;
         }
 
