@@ -14,8 +14,9 @@ public class Client {
 
     public static void main(String[] args) {
         Scanner sc = new Scanner(System.in);
+        boolean running = true;
 
-        while (true) {
+        while (running) {
             System.out.print("Введите команду: ");
             if (!sc.hasNextLine()) {
                 System.out.println("Ввод завершён");
@@ -28,95 +29,115 @@ public class Client {
             String[] parts = cmd.split("\\s+", 2);
             String name = parts[0];
             String arg = parts.length > 1 ? parts[1] : null;
-
-            if (name.equals("exit")) {
-                System.out.print("Выйти? (y/n): ");
-                if (sc.nextLine().equalsIgnoreCase("y")) break;
-                continue;
-            }
-
-            if (name.equals("execute_script")) {
-                executeScript(arg, sc);
-                continue;
-            }
-
-            if (name.equals("save")) {
-                System.out.println("Команда недоступна на клиенте. Используйте серверную команду");
-                continue;
-            }
-
             Request request;
 
-            if (name.equals("add")) {
-                LabWork lw = createLabWork(sc);
-                request = new Request("add", lw);
-            }
+            switch (name) {
 
-
-            else if (name.equals("add_if_min")) {
-                LabWork lw = createLabWork(sc);
-                request = new Request("add_if_min", lw);
-            }
-
-
-            else if (name.equals("update_id")) {
-                if (arg == null) {
-                    System.out.println("Введите id");
+                case "exit":
+                    System.out.print("Выйти? (y/n): ");
+                    if (sc.nextLine().equalsIgnoreCase("y")) {
+                        running = false;
+                    }
                     continue;
-                }
 
-                try {
-                    Long id = Long.parseLong(arg);
+                case "execute_script":
+                    executeScript(arg, sc);
+                    continue;
+
+                case "save":
+                    System.out.println("Команда недоступна на клиенте. Используйте серверную команду");
+                    continue;
+
+                case "add": {
                     LabWork lw = createLabWork(sc);
-                    request = new Request("update_id", new UpdateRequest(id, lw));
-                } catch (Exception e) {
-                    System.out.println("Неверный id");
-                    continue;
+                    request = new Request("add", lw);
+                    break;
                 }
-            }
 
-            else {
-                request = new Request(name, arg);
+                case "add_if_min": {
+                    LabWork lw = createLabWork(sc);
+                    request = new Request("add_if_min", lw);
+                    break;
+                }
+
+                case "update_id": {
+                    if (arg == null) {
+                        System.out.println("Введите id");
+                        continue;
+                    }
+
+                    try {
+                        Long id = Long.parseLong(arg);
+                        LabWork lw = createLabWork(sc);
+                        request = new Request("update_id", new UpdateRequest(id, lw));
+                    } catch (Exception e) {
+                        System.out.println("Неверный id");
+                        continue;
+                    }
+                    break;
+                }
+
+                default:
+                    request = new Request(name, arg);
+                    break;
             }
 
             sendRequest(request);
         }
     }
     public static void sendRequest(Request request) {
-        try {
-            Socket socket = new Socket("localhost", 12345);
 
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            ObjectOutputStream oos = new ObjectOutputStream(baos);
-            oos.writeObject(request);
+        int attempts = 3;
 
-            byte[] data = baos.toByteArray();
+        for (int i = 1; i <= attempts; i++) {
+            try {
+                Socket socket = new Socket("localhost", 12345);
 
-            OutputStream out = socket.getOutputStream();
-            InputStream in = socket.getInputStream();
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                ObjectOutputStream oos = new ObjectOutputStream(baos);
+                oos.writeObject(request);
 
-            DataOutputStream dos = new DataOutputStream(out);
-            dos.writeInt(data.length);
-            dos.write(data);
-            dos.flush();
+                byte[] data = baos.toByteArray();
 
-            DataInputStream dis = new DataInputStream(in);
-            int size = dis.readInt();
+                OutputStream out = socket.getOutputStream();
+                InputStream in = socket.getInputStream();
 
-            byte[] resp = new byte[size];
-            dis.readFully(resp);
+                DataOutputStream dos = new DataOutputStream(out);
+                dos.writeInt(data.length);
+                dos.write(data);
+                dos.flush();
 
-            ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(resp));
-            Response response = (Response) ois.readObject();
+                DataInputStream dis = new DataInputStream(in);
+                int size = dis.readInt();
 
-            System.out.println(response.getMessage());
+                byte[] resp = new byte[size];
+                dis.readFully(resp);
 
-            socket.close();
+                ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(resp));
+                Response response = (Response) ois.readObject();
 
-        } catch (IOException e) {
-            System.out.println("Сервер недоступен");
-        } catch (ClassNotFoundException e) {
-            System.out.println("Ошибка ответа");
+                System.out.println(response.getMessage());
+
+                socket.close();
+
+                return;
+
+            } catch (IOException e) {
+
+                System.out.println("Попытка " + i + " не удалась");
+
+                if (i == attempts) {
+                    System.out.println("Сервер недоступен");
+                } else {
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException ignored) {}
+                }
+
+            } catch (ClassNotFoundException e) {
+                System.out.println("Ошибка ответа");
+                return;
+            }
         }
     }
     public static void executeScript(String filename, Scanner sc) {

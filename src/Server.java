@@ -3,6 +3,7 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.*;
 import java.util.Iterator;
+import java.util.Scanner;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,7 +64,9 @@ public class Server {
             server.bind(new InetSocketAddress(12345));
             server.configureBlocking(false);
         } catch (IOException e) {
+
             logger.error("Порт уже занят. Сервер уже запущен.");
+
             return;
         }
 
@@ -71,6 +74,26 @@ public class Server {
         server.register(selector, SelectionKey.OP_ACCEPT);
 
         logger.info("Сервер запущен...");
+        new Thread(() -> {
+            Scanner sc = new Scanner(System.in);
+
+            try {
+                while (true) {
+                    String cmd = sc.nextLine();
+
+                    if (cmd.equals("save")) {
+                        try {
+                            xw.write();
+                            logger.info("Коллекция сохранена");
+                        } catch (Exception e) {
+                            logger.error("Ошибка сохранения");
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                logger.info("Консольный поток завершён");
+            }
+        }).start();
 
         while (true) {
             selector.select();
